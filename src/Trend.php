@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
 
 class Trend
 {
-    public string $interval;
+    public TrendInterval $interval;
 
     public Carbon $start;
 
@@ -45,36 +45,36 @@ class Trend
         return $this;
     }
 
-    public function interval(string $interval): self
+    private function interval(string $unit, int $amount): self
     {
-        $this->interval = $interval;
+        $this->interval = new TrendInterval($unit, $amount);
 
         return $this;
     }
 
     public function perMinute(): self
     {
-        return $this->interval('minute');
+        return $this->interval('minute', 1);
     }
 
     public function perHour(): self
     {
-        return $this->interval('hour');
+        return $this->interval('hour', 1);
     }
 
     public function perDay(): self
     {
-        return $this->interval('day');
+        return $this->interval('day', 1);
     }
 
     public function perMonth(): self
     {
-        return $this->interval('month');
+        return $this->interval('month', 1);
     }
 
     public function perYear(): self
     {
-        return $this->interval('year');
+        return $this->interval('year', 1);
     }
 
     public function dateColumn(string $column): self
@@ -96,7 +96,7 @@ class Trend
         $values = $this->builder
             ->toBase()
             ->selectRaw("
-                {$this->getSqlDate()} as {$this->dateAlias},
+                {$this->getSqlDate()}
                 {$aggregate}({$column}) as aggregate
             ")
             ->whereBetween($this->dateColumn, [$this->start, $this->end])
@@ -141,7 +141,7 @@ class Trend
 
         $placeholders = $this->getDatePeriod()->map(
             fn (Carbon $date) => new TrendValue(
-                date: $date->format($this->getCarbonDateFormat()),
+                date: $date,
                 aggregate: 0,
             )
         );
@@ -159,7 +159,7 @@ class Trend
             CarbonPeriod::between(
                 $this->start,
                 $this->end,
-            )->interval("1 {$this->interval}")
+            )->interval("{$this->interval->amount} {$this->interval->unit}")
         );
     }
 
@@ -172,18 +172,6 @@ class Trend
             default => throw new Error('Unsupported database driver.'),
         };
 
-        return $adapter->format($this->dateColumn, $this->interval);
-    }
-
-    protected function getCarbonDateFormat(): string
-    {
-        return match ($this->interval) {
-            'minute' => 'Y-m-d H:i:00',
-            'hour' => 'Y-m-d H:00',
-            'day' => 'Y-m-d',
-            'month' => 'Y-m',
-            'year' => 'Y',
-            default => throw new Error('Invalid interval.'),
-        };
+        return $adapter->format($this->dateColumn, $this->interval->unit);
     }
 }

@@ -2,21 +2,40 @@
 
 namespace Flowframe\Trend\Adapters;
 
-use Error;
+use Flowframe\Trend\TrendInterval;
 
 class MySqlAdapter extends AbstractAdapter
 {
-    public function format(string $column, string $interval): string
-    {
-        $format = match ($interval) {
-            'minute' => '%Y-%m-%d %H:%i:00',
-            'hour' => '%Y-%m-%d %H:00',
-            'day' => '%Y-%m-%d',
-            'month' => '%Y-%m',
-            'year' => '%Y',
-            default => throw new Error('Invalid interval.'),
-        };
+    public array $units = [
+        'minute',
+        'hour',
+        'day',
+        'month',
+        'year'
+    ];
 
-        return "date_format({$column}, '{$format}')";
+    public function format(string $column, TrendInterval $interval): string
+    {
+        $str = str();
+
+        $reversed = array_reverse($this->units);
+
+        foreach($reversed as $unit) {
+            if(!in_array($unit, $interval->setUnits)) {
+                $str->append('0 as {$unit}');
+
+                continue;
+            }
+
+            if($unit === $interval->unit) {
+                $str->append('(datepart(${unit}, DT.[{$column}]) / {$interval->amount}) as {$unit}');
+            }
+
+            $str->append('datepart({$unit}, DT.[{$column}]) as {$unit}');
+        }
+
+        dd($str);
+
+        return $str;
     }
 }
